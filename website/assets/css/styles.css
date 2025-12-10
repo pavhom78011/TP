@@ -34,8 +34,6 @@ body {
   padding: 22px;
 }
 
-/* Header */
-
 .site-header {
   position: sticky;
   top: 0;
@@ -71,8 +69,6 @@ body {
   font-size: 13px;
 }
 
-/* Navigation */
-
 .main-nav .menu {
   display: flex;
   gap: 10px;
@@ -103,8 +99,6 @@ body {
   font-weight: 700;
 }
 
-/* Panels */
-
 .panel {
   background: var(--card);
   border-radius: var(--radius);
@@ -117,8 +111,6 @@ body {
 .panel h3 {
   margin-top: 0;
 }
-
-/* Hero */
 
 .hero {
   display: flex;
@@ -154,8 +146,6 @@ body {
   font-size: 14px;
 }
 
-/* Stat */
-
 .stat {
   background: linear-gradient(180deg,#fff,#f7fbff);
   padding: 12px;
@@ -173,8 +163,6 @@ body {
   font-size: 13px;
   color: var(--muted);
 }
-
-/* Buttons */
 
 .btn {
   background: var(--accent);
@@ -209,8 +197,6 @@ body {
   box-shadow: none;
 }
 
-/* Forms */
-
 .row {
   display: flex;
   gap: 12px;
@@ -232,8 +218,6 @@ body {
   background: rgba(250,251,255,0.9);
   margin-top: 6px;
 }
-
-/* Table-like list */
 
 .table-like {
   border-radius: 12px;
@@ -271,8 +255,6 @@ body {
   justify-content: flex-end;
 }
 
-/* Cards */
-
 .card-list {
   display: grid;
   grid-template-columns: repeat(auto-fit,minmax(260px,1fr));
@@ -303,21 +285,15 @@ body {
   margin-top: 10px;
 }
 
-/* Orders */
-
 .orders-list .card {
   background: linear-gradient(180deg,#fff,#fffefc);
 }
-
-/* Admin */
 
 .admin-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-
-/* Form layout */
 
 .item-form {
   display: grid;
@@ -342,8 +318,6 @@ body {
   margin-top: 10px;
 }
 
-/* Modal-like */
-
 .panel-modal {
   border: 1px solid rgba(11,34,60,0.04);
   box-shadow: 0 8px 40px rgba(11,34,60,0.06);
@@ -354,8 +328,6 @@ body {
   background: #fff7f7;
   color: var(--danger);
 }
-
-/* Footer */
 
 .site-footer {
   padding: 18px 0;
@@ -371,8 +343,6 @@ body {
   color: var(--muted);
   font-size: 14px;
 }
-
-/* Responsive */
 
 @media (max-width:900px) {
   .hero {

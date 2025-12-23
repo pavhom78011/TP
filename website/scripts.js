@@ -22,11 +22,47 @@ const initialObjs = [
 
 class AmbulanceCollection {
   _objs = [];
+  _storageKey = 'ambulance_system_data';
 
   constructor(objs = []) {
     if (!Array.isArray(objs)) throw new Error('Constructor expects array');
     this._objs = [];
-    this.addAll(objs);
+    const restored = this.restore();
+    if (restored && restored.length > 0) {
+      this.addAll(restored);
+    } else {
+      this.addAll(objs);
+      this.save();
+    }
+  }
+
+  save() {
+    try {
+      const data = JSON.stringify(this._objs);
+      localStorage.setItem(this._storageKey, data);
+      return true;
+    } catch (e) {
+      console.error('Ошибка сохранения в localStorage:', e);
+      return false;
+    }
+  }
+
+  restore() {
+    try {
+      const data = localStorage.getItem(this._storageKey);
+      if (data) {
+        const parsed = JSON.parse(data);
+        return parsed.map(obj => {
+          if (obj.createdAt) obj.createdAt = new Date(obj.createdAt);
+          if (obj.dateTime) obj.dateTime = new Date(obj.dateTime);
+          if (obj.arrivalTime) obj.arrivalTime = new Date(obj.arrivalTime);
+          return obj;
+        });
+      }
+    } catch (e) {
+      console.error('Ошибка восстановления из localStorage:', e);
+    }
+    return null;
   }
 
   _isUniqueId(id) {
@@ -84,11 +120,11 @@ class AmbulanceCollection {
       if (!this.validateObj(normalized)) return { ok: false, reason: 'validation_failed' };
       if (!this._isUniqueId(normalized.id)) return { ok: false, reason: 'duplicate_id' };
       const clone = JSON.parse(JSON.stringify(normalized));
-      // Гарантируем Date объекты в хранилище
       clone.createdAt = new Date(normalized.createdAt);
       if (normalized.dateTime) clone.dateTime = new Date(normalized.dateTime);
       if (normalized.arrivalTime) clone.arrivalTime = normalized.arrivalTime ? new Date(normalized.arrivalTime) : null;
       this._objs.push(clone);
+      this.save();
       return { ok: true };
     } catch (e) {
       console.error('addObj error', e);
@@ -108,6 +144,8 @@ class AmbulanceCollection {
 
   clear() {
     this._objs = [];
+    localStorage.removeItem(this._storageKey);
+    return true;
   }
 
   getObj(id) {
@@ -120,6 +158,7 @@ class AmbulanceCollection {
     const idx = this._objs.findIndex(o => o.id === id);
     if (idx === -1) return false;
     this._objs.splice(idx, 1);
+    this.save();
     return true;
   }
 
@@ -127,7 +166,7 @@ class AmbulanceCollection {
     if (!id || typeof objPatch !== 'object' || objPatch === null) return { ok: false, reason: 'invalid_params' };
     const idx = this._objs.findIndex(o => o.id === id);
     if (idx === -1) return { ok: false, reason: 'not_found' };
-    const target = Object.assign({}, this._objs[idx]); // shallow clone current stored object
+    const target = Object.assign({}, this._objs[idx]);
 
     if ('id' in objPatch && objPatch.id !== id) return { ok: false, reason: 'id_change_forbidden' };
     if ('author' in objPatch && objPatch.author !== target.author) return { ok: false, reason: 'author_change_forbidden' };
@@ -143,6 +182,7 @@ class AmbulanceCollection {
     if (normalized.dateTime) clone.dateTime = new Date(normalized.dateTime);
     if (normalized.arrivalTime) clone.arrivalTime = normalized.arrivalTime ? new Date(normalized.arrivalTime) : null;
     this._objs[idx] = clone;
+    this.save();
     return { ok: true };
   }
 
@@ -160,6 +200,15 @@ class AmbulanceCollection {
         if (filterConfig.staffNumber && obj.staffNumber !== filterConfig.staffNumber) return false;
         if (filterConfig.position && obj.position !== filterConfig.position) return false;
         if (filterConfig.status && obj.status !== filterConfig.status) return false;
+        if (filterConfig.searchText) {
+          const search = filterConfig.searchText.toLowerCase();
+          const matches = 
+            (obj.fullName && obj.fullName.toLowerCase().includes(search)) ||
+            (obj.description && obj.description.toLowerCase().includes(search)) ||
+            (obj.address && obj.address.toLowerCase().includes(search)) ||
+            (obj.patientName && obj.patientName.toLowerCase().includes(search));
+          if (!matches) return false;
+        }
 
         if (filterConfig.dateFrom) {
           const from = new Date(filterConfig.dateFrom);
@@ -183,14 +232,873 @@ class AmbulanceCollection {
   _dumpAll() {
     return this._objs.map(o => JSON.parse(JSON.stringify(o)));
   }
+
+  getStats() {
+    const all = this._objs;
+    return {
+      total: all.length,
+      calls: all.filter(o => o.type === 'call').length,
+      employees: all.filter(o => o.type === 'employee').length,
+      orders: all.filter(o => o.type === 'order').length,
+      brigades: [...new Set(all.map(o => o.brigade).filter(Boolean))].length
+    };
+  }
 }
 
 const ambulanceCollection = new AmbulanceCollection(initialObjs);
-console.group('AmbulanceCollection demo (final)');
+console.group('AmbulanceCollection');
 console.log('_dumpAll', ambulanceCollection._dumpAll());
 console.log('removeObj', ambulanceCollection.removeObj('emp-001'));
 console.log('_dumpAll', ambulanceCollection._dumpAll());
 console.log('getObjs(0,8):', ambulanceCollection.getObjs(0, 8));
 console.log('getObjs filtered calls in 2025-04-01..2025-06-30:', ambulanceCollection.getObjs(0, 50, { type: 'call', dateFrom: '2025-04-01', dateTo: '2025-06-30' }));
 console.log('Employees in brigade Б-01:', ambulanceCollection.getObjs(0, 50, { type: 'employee', brigade: 'Б-01' }));
+const validEmployee = {
+  id: 'test-emp',
+  description: 'Тестовый сотрудник',
+  createdAt: new Date(),
+  author: 'Тест',
+  type: 'employee',
+  staffNumber: '9999',
+  fullName: 'Тестов Тест Тестович',
+  position: 'Врач',
+  shiftStart: '2024-01-01',
+  brigade: 'Б-99',
+  phones: ['+375291112233']
+};
+const validCall = {
+  id: 'test-call',
+  description: 'Тестовый вызов',
+  createdAt: new Date(),
+  author: 'Диспетчер',
+  type: 'call',
+  dateTime: new Date(),
+  brigade: 'Б-01',
+  address: 'ул. Тестовая, 1',
+  patientName: 'Пациент',
+  measures: 'Оказана помощь',
+  arrivalTime: new Date(),
+  status: 'closed',
+  crew: []
+};
+console.log('addObj', ambulanceCollection.addObj(validEmployee));
+console.log('_dumpAll', ambulanceCollection._dumpAll());
 console.groupEnd();
+
+class AmbulanceView {
+  constructor() {
+    this.userDisplay = document.getElementById('user-display');
+    this.callsContainer = document.getElementById('calls-data');
+    this.staffContainer = document.getElementById('staff-list');
+    this.ordersContainer = document.getElementById('orders-list');
+    this.statsElements = {
+      brigades: document.getElementById('brigades-count'),
+      staff: document.getElementById('staff-count'),
+      todayCalls: document.getElementById('today-calls'),
+      totalRecords: document.getElementById('total-records'),
+      callsCount: document.getElementById('calls-count'),
+      employeesCount: document.getElementById('employees-count'),
+      ordersCount: document.getElementById('orders-count')
+    };
+
+    this.requiredFields = {
+      call: ['call-datetime', 'call-brigade', 'call-address', 'call-measures'],
+      employee: ['emp-staff-number', 'emp-fullname', 'emp-position', 'emp-shift-start'],
+      order: ['order-number', 'order-date', 'order-description']
+    };
+
+    this._removeAllRequiredAttributes();
+  }
+
+  _removeAllRequiredAttributes() {
+    Object.values(this.requiredFields).flat().forEach(fieldId => {
+      const field = document.getElementById(fieldId);
+      if (field) {
+        field.removeAttribute('required');
+      }
+    });
+  }
+
+  formatDate(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  renderUser(username) {
+    if (username) {
+      this.userDisplay.textContent = `Пользователь: ${username}`;
+      this.userDisplay.style.color = 'var(--accent)';
+    } else {
+      this.userDisplay.textContent = 'Гость';
+      this.userDisplay.style.color = 'var(--muted)';
+    }
+  }
+
+  renderStats(stats) {
+    if (this.statsElements.brigades) this.statsElements.brigades.textContent = stats.brigades;
+    if (this.statsElements.staff) this.statsElements.staff.textContent = stats.employees;
+    if (this.statsElements.todayCalls) {
+      const today = new Date().toDateString();
+      const todayCalls = stats.calls;
+      this.statsElements.todayCalls.textContent = todayCalls;
+    }
+    if (this.statsElements.totalRecords) this.statsElements.totalRecords.textContent = stats.total;
+    if (this.statsElements.callsCount) this.statsElements.callsCount.textContent = stats.calls;
+    if (this.statsElements.employeesCount) this.statsElements.employeesCount.textContent = stats.employees;
+    if (this.statsElements.ordersCount) this.statsElements.ordersCount.textContent = stats.orders;
+  }
+
+  renderCalls(calls, currentUser, hasMore = false) {
+    this.callsContainer.innerHTML = '';
+    
+    if (calls.length === 0) {
+      this.callsContainer.innerHTML = '<div class="row" style="padding: 30px; text-align: center; color: var(--muted);">Нет данных для отображения</div>';
+      return;
+    }
+
+    calls.forEach(call => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.setAttribute('data-id', call.id);
+      
+      const actionsHtml = currentUser ? `
+        <button class="btn small" data-action="edit" data-id="${call.id}">Ред.</button>
+        <button class="btn small danger" data-action="delete" data-id="${call.id}">Уд.</button>
+      ` : '<span style="color:var(--muted); font-size:0.8em;">Нет прав</span>';
+
+      row.innerHTML = `
+        <div class="cell">${call.id}</div>
+        <div class="cell">${this.formatDate(call.dateTime)}</div>
+        <div class="cell">${call.brigade}</div>
+        <div class="cell">${call.address}</div>
+        <div class="cell">${call.patientName || 'Нет данных'}</div>
+        <div class="cell">
+          <span class="status-badge ${call.status === 'hospitalized' ? 'hospitalized' : 'closed'}">
+            ${call.status === 'hospitalized' ? 'Госпитализация' : 'Закрыт'}
+          </span>
+        </div>
+        <div class="cell actions">${actionsHtml}</div>
+      `;
+      this.callsContainer.appendChild(row);
+    });
+
+    const loadMoreBtn = document.getElementById('load-more-calls');
+    if (loadMoreBtn) {
+      loadMoreBtn.style.display = hasMore ? 'block' : 'none';
+    }
+  }
+
+  renderStaff(employees, currentUser) {
+    this.staffContainer.innerHTML = '';
+    
+    if (employees.length === 0) {
+      this.staffContainer.innerHTML = '<div style="padding: 30px; text-align: center; color: var(--muted);">Сотрудники не найдены</div>';
+      return;
+    }
+
+    employees.forEach(emp => {
+      const card = document.createElement('article');
+      card.className = 'card';
+      card.setAttribute('data-id', emp.id);
+      
+      const actions = currentUser ? `
+        <div class="card-actions">
+          <button class="btn small" data-action="edit" data-id="${emp.id}">Редактировать</button>
+          <button class="btn small danger" data-action="delete" data-id="${emp.id}">Удалить</button>
+        </div>` : '';
+
+      card.innerHTML = `
+        <div class="card-head">
+          <h4>${emp.fullName}</h4>
+          <div class="meta"><span>${emp.position} · Таб.№ ${emp.staffNumber}</span></div>
+        </div>
+        <div class="card-body">
+          <p><strong>Бригада:</strong> ${emp.brigade || 'Не назначена'}</p>
+          <p><strong>Дата начала:</strong> ${emp.shiftStart}</p>
+          <p class="muted"><strong>Телефоны:</strong> ${emp.phones && emp.phones.length > 0 ? emp.phones.join(', ') : 'Не указаны'}</p>
+        </div>
+        ${actions}
+      `;
+      this.staffContainer.appendChild(card);
+    });
+  }
+
+  renderOrders(orders) {
+    this.ordersContainer.innerHTML = '';
+    
+    if (orders.length === 0) {
+      this.ordersContainer.innerHTML = '<div style="padding: 30px; text-align: center; color: var(--muted);">Приказы не найдены</div>';
+      return;
+    }
+
+    orders.forEach(ord => {
+      const div = document.createElement('article');
+      div.className = 'card';
+      div.setAttribute('data-id', ord.id);
+      div.innerHTML = `
+        <h4>Приказ №${ord.orderNumber} от ${ord.orderDate}</h4>
+        <p>${ord.description}</p>
+        ${ord.positions && ord.positions.length > 0 ? `
+          <div style="margin-top: 10px; font-size: 14px; color: var(--muted);">
+            <strong>Позиции:</strong>
+            <ul style="margin: 5px 0; padding-left: 20px;">
+              ${ord.positions.map(pos => `<li>${pos.fullName} → ${pos.brigade} (${pos.from} - ${pos.to})</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      `;
+      this.ordersContainer.appendChild(div);
+    });
+  }
+
+  showItemForm(type = 'call', data = null) {
+    const formSection = document.getElementById('add-edit');
+    const itemType = document.getElementById('item-type');
+    const itemId = document.getElementById('edit-item-id');
+    const description = document.getElementById('item-description');
+    itemType.value = type;
+    
+    document.getElementById('call-fields').style.display = type === 'call' ? 'block' : 'none';
+    document.getElementById('employee-fields').style.display = type === 'employee' ? 'block' : 'none';
+    document.getElementById('order-fields').style.display = type === 'order' ? 'block' : 'none';
+    
+    this.updateRequiredAttributes(type);
+    
+    if (data) {
+      itemId.value = data.id;
+      description.value = data.description || '';
+      
+      if (type === 'call') {
+        document.getElementById('call-datetime').value = this.formatDateTimeForInput(data.dateTime);
+        document.getElementById('call-brigade').value = data.brigade || '';
+        document.getElementById('call-address').value = data.address || '';
+        document.getElementById('call-patient').value = data.patientName || '';
+        document.getElementById('call-measures').value = data.measures || '';
+        document.getElementById('call-status').value = data.status || 'closed';
+        document.getElementById('call-arrival').value = this.formatDateTimeForInput(data.arrivalTime);
+      } else if (type === 'employee') {
+        document.getElementById('emp-staff-number').value = data.staffNumber || '';
+        document.getElementById('emp-fullname').value = data.fullName || '';
+        document.getElementById('emp-position').value = data.position || '';
+        document.getElementById('emp-brigade').value = data.brigade || '';
+        document.getElementById('emp-shift-start').value = data.shiftStart || '';
+        document.getElementById('emp-phones').value = data.phones ? data.phones.join(', ') : '';
+      } else if (type === 'order') {
+        document.getElementById('order-number').value = data.orderNumber || '';
+        document.getElementById('order-date').value = data.orderDate || '';
+        document.getElementById('order-description').value = data.description || '';
+      }
+    } else {
+      itemId.value = '';
+      description.value = '';
+      const today = new Date().toISOString().split('T')[0];
+      const now = new Date().toISOString().slice(0, 16);
+      
+      if (type === 'call') {
+        document.getElementById('call-datetime').value = now;
+        document.getElementById('call-arrival').value = now;
+      } else if (type === 'employee') {
+        document.getElementById('emp-shift-start').value = today;
+      } else if (type === 'order') {
+        document.getElementById('order-date').value = today;
+      }
+    }
+    
+    formSection.style.display = 'block';
+    formSection.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  updateRequiredAttributes(type) {
+    this._removeAllRequiredAttributes();
+    
+    if (type && this.requiredFields[type]) {
+      this.requiredFields[type].forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+          field.setAttribute('required', 'required');
+        }
+      });
+    }
+  }
+
+  hideItemForm() {
+    const formSection = document.getElementById('add-edit');
+    formSection.style.display = 'none';
+    document.getElementById('item-form').reset();
+    document.getElementById('edit-item-id').value = '';
+  }
+
+  showAuthModal() {
+    document.getElementById('auth-modal').style.display = 'flex';
+  }
+
+  hideAuthModal() {
+    document.getElementById('auth-modal').style.display = 'none';
+    document.getElementById('auth-form').reset();
+  }
+
+  showReport(content) {
+    const reportResult = document.getElementById('report-result');
+    reportResult.innerHTML = content;
+    reportResult.style.display = 'block';
+  }
+
+  showNotification(message, type = 'info') {
+    const container = document.querySelector('.notification-container') || this.createNotificationContainer();
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    container.appendChild(notification);
+    
+    setTimeout(() => {
+      notification.style.animation = 'slideOut 0.3s ease-out';
+      setTimeout(() => notification.remove(), 300);
+    }, 5000);
+  }
+
+  createNotificationContainer() {
+    const container = document.createElement('div');
+    container.className = 'notification-container';
+    document.body.appendChild(container);
+    return container;
+  }
+
+  formatDateTimeForInput(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toISOString().slice(0, 16);
+  }
+}
+
+class AmbulanceController {
+  constructor(model, view) {
+    this.model = model;
+    this.view = view;
+    this.currentUser = localStorage.getItem('ambulance_user') || null;
+    this.currentPage = 0;
+    this.pageSize = 10;
+    this.currentFilter = { type: 'call' };
+    this.currentSearch = '';
+    this.init();
+  }
+
+  init() {
+    this.bindEvents();
+    this.updateAllViews();
+  }
+
+  bindEvents() {
+    document.getElementById('openAuth').addEventListener('click', () => this.showAuth());
+    document.getElementById('cancel-auth').addEventListener('click', () => this.view.hideAuthModal());
+    document.getElementById('auth-form').addEventListener('submit', (e) => this.handleAuth(e));
+
+    document.querySelector('.filter-form').addEventListener('submit', (e) => this.handleFilter(e));
+    document.getElementById('clear-filter').addEventListener('click', () => this.clearFilter());
+
+    document.getElementById('staff-search').addEventListener('input', (e) => this.handleStaffSearch(e));
+
+    document.querySelectorAll('[data-action="new-call"]').forEach(btn => 
+      btn.addEventListener('click', () => this.showItemForm('call')));
+    document.querySelectorAll('[data-action="add-employee"]').forEach(btn => 
+      btn.addEventListener('click', () => this.showItemForm('employee')));
+    document.querySelectorAll('[data-action="create-order"]').forEach(btn => 
+      btn.addEventListener('click', () => this.showItemForm('order')));
+
+    document.getElementById('item-form').addEventListener('submit', (e) => this.handleItemSubmit(e));
+    document.getElementById('cancel-edit').addEventListener('click', () => this.view.hideItemForm());
+    document.getElementById('item-type').addEventListener('change', (e) => this.handleTypeChange(e));
+
+    document.getElementById('report-form').addEventListener('submit', (e) => this.handleReport(e));
+
+    document.getElementById('export-data').addEventListener('click', () => this.exportData());
+    document.getElementById('import-data').addEventListener('click', () => this.importData());
+    document.getElementById('clear-data').addEventListener('click', () => this.clearAllData());
+
+    document.getElementById('load-more-calls').addEventListener('click', () => this.loadMoreCalls());
+
+    document.addEventListener('click', (e) => this.handleDynamicActions(e));
+  }
+
+  handleDynamicActions(e) {
+    const target = e.target;
+    const action = target.getAttribute('data-action');
+    const id = target.getAttribute('data-id');
+    
+    if (!action || !id) return;
+    
+    if (action === 'edit') {
+      this.editItem(id);
+    } else if (action === 'delete') {
+      if (confirm('Вы уверены, что хотите удалить этот элемент?')) {
+        this.deleteItem(id);
+      }
+    }
+  }
+
+  showAuth() {
+    if (this.currentUser) {
+      this.logout();
+    } else {
+      this.view.showAuthModal();
+    }
+  }
+
+  handleAuth(e) {
+    e.preventDefault();
+    const username = document.getElementById('login-username').value;
+    const password = document.getElementById('login-password').value;
+    
+    if (username && password) {
+      this.currentUser = username;
+      localStorage.setItem('ambulance_user', username);
+      this.view.hideAuthModal();
+      this.updateAllViews();
+      this.view.showNotification(`Вход выполнен как ${username}`, 'success');
+    } else {
+      this.view.showNotification('Введите логин и пароль', 'error');
+    }
+  }
+
+  logout() {
+    this.currentUser = null;
+    localStorage.removeItem('ambulance_user');
+    this.updateAllViews();
+    this.view.showNotification('Выход выполнен', 'info');
+  }
+
+  handleFilter(e) {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    this.currentFilter = { type: 'call' };
+    this.currentPage = 0;
+    
+    if (formData.get('dateFrom')) this.currentFilter.dateFrom = formData.get('dateFrom');
+    if (formData.get('dateTo')) this.currentFilter.dateTo = formData.get('dateTo');
+    if (formData.get('brigade')) this.currentFilter.brigade = formData.get('brigade');
+    if (formData.get('status')) this.currentFilter.status = formData.get('status');
+    
+    this.updateCallsView();
+  }
+
+  clearFilter() {
+    this.currentFilter = { type: 'call' };
+    this.currentPage = 0;
+    document.querySelector('.filter-form').reset();
+    this.updateCallsView();
+  }
+
+  handleStaffSearch(e) {
+    this.currentSearch = e.target.value;
+    this.updateStaffView();
+  }
+
+  showItemForm(type, id = null) {
+    if (!this.currentUser) {
+      this.view.showNotification('Требуется авторизация', 'error');
+      this.showAuth();
+      return;
+    }
+    
+    if (id) {
+      const item = this.model.getObj(id);
+      if (item) {
+        this.view.showItemForm(type, item);
+      }
+    } else {
+      this.view.showItemForm(type);
+    }
+  }
+
+  handleTypeChange(e) {
+    const type = e.target.value;
+    if (!type) return;
+    
+    document.getElementById('call-fields').style.display = type === 'call' ? 'block' : 'none';
+    document.getElementById('employee-fields').style.display = type === 'employee' ? 'block' : 'none';
+    document.getElementById('order-fields').style.display = type === 'order' ? 'block' : 'none';
+    
+    this.view.updateRequiredAttributes(type);
+  }
+
+  handleItemSubmit(e) {
+    e.preventDefault();
+    if (!this.currentUser) {
+      this.view.showNotification('Требуется авторизация', 'error');
+      return;
+    }
+    
+    const type = document.getElementById('item-type').value;
+    const id = document.getElementById('edit-item-id').value;
+    const description = document.getElementById('item-description').value;
+    
+    if (!type) {
+      this.view.showNotification('Выберите тип записи', 'error');
+      return;
+    }
+    
+    if (!description || description.trim() === '') {
+      this.view.showNotification('Заполните краткое описание', 'error');
+      document.getElementById('item-description').focus();
+      return;
+    }
+    
+    let validationPassed = true;
+    
+    if (type === 'call') {
+      const requiredFields = ['call-datetime', 'call-brigade', 'call-address', 'call-measures'];
+      requiredFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field && (!field.value || field.value.trim() === '')) {
+          field.classList.add('error');
+          validationPassed = false;
+        } else if (field) {
+          field.classList.remove('error');
+        }
+      });
+    } else if (type === 'employee') {
+      const requiredFields = ['emp-staff-number', 'emp-fullname', 'emp-position', 'emp-shift-start'];
+      requiredFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field && (!field.value || field.value.trim() === '')) {
+          field.classList.add('error');
+          validationPassed = false;
+        } else if (field) {
+          field.classList.remove('error');
+        }
+      });
+    } else if (type === 'order') {
+      const requiredFields = ['order-number', 'order-date', 'order-description'];
+      requiredFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field && (!field.value || field.value.trim() === '')) {
+          field.classList.add('error');
+          validationPassed = false;
+        } else if (field) {
+          field.classList.remove('error');
+        }
+      });
+    }
+    
+    if (!validationPassed) {
+      this.view.showNotification('Заполните все обязательные поля', 'error');
+      return;
+    }
+    
+    let itemData = {
+      type,
+      description,
+      createdAt: new Date(),
+      author: this.currentUser,
+      photoLink: ''
+    };
+    
+    if (type === 'call') {
+      itemData.id = id || `call-${Date.now()}`;
+      itemData.dateTime = new Date(document.getElementById('call-datetime').value);
+      itemData.brigade = document.getElementById('call-brigade').value;
+      itemData.address = document.getElementById('call-address').value;
+      itemData.patientName = document.getElementById('call-patient').value;
+      itemData.measures = document.getElementById('call-measures').value;
+      itemData.status = document.getElementById('call-status').value;
+      itemData.arrivalTime = new Date(document.getElementById('call-arrival').value);
+      itemData.crew = [];
+      itemData.hospitalSent = null;
+    } else if (type === 'employee') {
+      itemData.id = id || `emp-${Date.now()}`;
+      itemData.staffNumber = document.getElementById('emp-staff-number').value;
+      itemData.fullName = document.getElementById('emp-fullname').value;
+      itemData.position = document.getElementById('emp-position').value;
+      itemData.brigade = document.getElementById('emp-brigade').value;
+      itemData.shiftStart = document.getElementById('emp-shift-start').value;
+      const phones = document.getElementById('emp-phones').value;
+      itemData.phones = phones ? phones.split(',').map(p => p.trim()).filter(p => p) : [];
+    } else if (type === 'order') {
+      itemData.id = id || `ord-${Date.now()}`;
+      itemData.orderNumber = document.getElementById('order-number').value;
+      itemData.orderDate = document.getElementById('order-date').value;
+      itemData.positions = [];
+    }
+    
+    let result;
+    if (id) {
+      result = this.model.editObj(id, itemData);
+    } else {
+      result = this.model.addObj(itemData);
+    }
+    
+    if (result.ok) {
+      this.view.hideItemForm();
+      this.updateAllViews();
+      this.view.showNotification(id ? 'Данные обновлены' : 'Запись добавлена', 'success');
+    } else {
+      this.view.showNotification(`Ошибка: ${result.reason}`, 'error');
+    }
+  }
+
+  editItem(id) {
+    const item = this.model.getObj(id);
+    if (item) {
+      this.showItemForm(item.type, id);
+    }
+  }
+
+  deleteItem(id) {
+    if (!this.currentUser) {
+      this.view.showNotification('Требуется авторизация', 'error');
+      return;
+    }
+    
+    const success = this.model.removeObj(id);
+    if (success) {
+      this.updateAllViews();
+      this.view.showNotification('Запись удалена', 'success');
+    } else {
+      this.view.showNotification('Ошибка удаления', 'error');
+    }
+  }
+
+  loadMoreCalls() {
+    this.currentPage++;
+    this.updateCallsView();
+  }
+
+  updateCallsView() {
+    const skip = this.currentPage * this.pageSize;
+    const calls = this.model.getObjs(0, skip + this.pageSize + 1, this.currentFilter);
+    const hasMore = calls.length > (skip + this.pageSize);
+    const displayCalls = calls.slice(0, skip + this.pageSize);
+    
+    this.view.renderCalls(displayCalls, this.currentUser, hasMore);
+  }
+
+  updateStaffView() {
+    const filter = { type: 'employee' };
+    if (this.currentSearch) {
+      filter.searchText = this.currentSearch;
+    }
+    const staff = this.model.getObjs(0, 100, filter);
+    this.view.renderStaff(staff, this.currentUser);
+  }
+
+  updateAllViews() {
+    this.view.renderUser(this.currentUser);
+    this.updateCallsView();
+    this.updateStaffView();
+    
+    const orders = this.model.getObjs(0, 100, { type: 'order' });
+    this.view.renderOrders(orders);
+    
+    const stats = this.model.getStats();
+    this.view.renderStats(stats);
+  }
+
+  handleReport(e) {
+    e.preventDefault();
+    const date = document.getElementById('report-date').value;
+    const type = document.getElementById('report-type').value;
+    
+    if (!date || !type) {
+      this.view.showNotification('Заполните все поля', 'error');
+      return;
+    }
+    
+    let reportContent = '';
+    const reportDate = new Date(date);
+    
+    if (type === 'calls-list') {
+      const calls = this.model.getObjs(0, 100, { type: 'call' }).filter(call => {
+        const callDate = new Date(call.dateTime);
+        return callDate.toDateString() === reportDate.toDateString();
+      });
+      
+      reportContent = `<h4>Список вызовов за ${date} (${calls.length}):</h4>`;
+      if (calls.length === 0) {
+        reportContent += '<p>На выбранную дату вызовов не было.</p>';
+      } else {
+        calls.forEach(call => {
+          reportContent += `
+            <div class="report-item">
+              <strong>${call.id}</strong> - ${this.view.formatDate(call.dateTime)}<br>
+              Бригада: ${call.brigade}, Адрес: ${call.address}<br>
+              Пациент: ${call.patientName || 'Не указан'}<br>
+              Меры: ${call.measures}
+            </div>
+          `;
+        });
+      }
+    } else if (type === 'longest-call') {
+      const calls = this.model.getObjs(0, 100, { type: 'call' }).filter(call => {
+        const callDate = new Date(call.dateTime);
+        return callDate.toDateString() === reportDate.toDateString();
+      });
+      
+      if (calls.length === 0) {
+        reportContent = '<p>На выбранную дату вызовов не было.</p>';
+      } else {
+        const longestCall = calls.reduce((longest, call) => {
+          const duration = new Date(call.arrivalTime) - new Date(call.dateTime);
+          return duration > longest.duration ? { call, duration } : longest;
+        }, { call: null, duration: 0 });
+        
+        const minutes = Math.floor(longestCall.duration / 60000);
+        reportContent = `
+          <h4>Самый длительный вызов за ${date}:</h4>
+          <div class="report-item">
+            <strong>${longestCall.call.id}</strong> - ${minutes} минут<br>
+            Бригада: ${longestCall.call.brigade}<br>
+            Адрес: ${longestCall.call.address}<br>
+            Пациент: ${longestCall.call.patientName || 'Не указан'}<br>
+            Меры: ${longestCall.call.measures}<br>
+            Время прибытия: ${this.view.formatDate(longestCall.call.arrivalTime)}
+          </div>
+        `;
+      }
+    } else if (type === 'brigade-staff') {
+      const employees = this.model.getObjs(0, 100, { type: 'employee' });
+      const brigades = [...new Set(employees.map(emp => emp.brigade).filter(Boolean))];
+      
+      reportContent = `<h4>Составы бригад на ${date}:</h4>`;
+      brigades.forEach(brigade => {
+        const brigadeEmployees = employees.filter(emp => emp.brigade === brigade);
+        reportContent += `
+          <div class="report-item">
+            <strong>Бригада ${brigade}:</strong> (${brigadeEmployees.length} сотрудников)<br>
+            ${brigadeEmployees.map(emp => 
+              `${emp.fullName} - ${emp.position} (таб. №${emp.staffNumber})`
+            ).join('<br>')}
+          </div>
+        `;
+      });
+    }
+    
+    this.view.showReport(reportContent);
+  }
+
+  exportData() {
+    const data = this.model._dumpAll();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ambulance_data_export.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    this.view.showNotification('Данные экспортированы', 'success');
+  }
+
+  importData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target.result);
+          if (confirm(`Импортировать ${data.length} записей? Существующие данные будут сохранены.`)) {
+            const rejections = this.model.addAll(data);
+            this.updateAllViews();
+            if (rejections.length === 0) {
+              this.view.showNotification(`Импортировано ${data.length} записей`, 'success');
+            } else {
+              this.view.showNotification(`Импортировано ${data.length - rejections.length} из ${data.length} записей`, 'warning');
+            }
+          }
+        } catch (error) {
+          this.view.showNotification('Ошибка чтения файла', 'error');
+        }
+      };
+      
+      reader.readAsText(file);
+    };
+    
+    input.click();
+  }
+
+  clearAllData() {
+    if (confirm('Вы уверены, что хотите удалить все данные? Это действие нельзя отменить.')) {
+      this.model.clear();
+      this.currentPage = 0;
+      this.currentFilter = { type: 'call' };
+      this.currentSearch = '';
+      this.updateAllViews();
+      this.view.showNotification('Все данные удалены', 'success');
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  console.log(' АИС "Скорая помощь" запущена');
+
+  const model = new AmbulanceCollection(initialObjs);
+  const view = new AmbulanceView();
+  const controller = new AmbulanceController(model, view);
+
+  window.ambulanceModel = model;
+  window.ambulanceController = controller;
+
+  window.addObj = (obj) => {
+    const result = model.addObj(obj);
+    if (result.ok) {
+      console.log('Объект добавлен:', obj);
+      controller.updateAllViews();
+    } else {
+      console.error('Ошибка добавления:', result.reason);
+    }
+  };
+  
+  window.removeObj = (id) => {
+    const res = model.removeObj(id);
+    if (res) {
+      console.log(`Объект ${id} удален.`);
+      controller.updateAllViews();
+    } else {
+      console.error(`Объект ${id} не найден.`);
+    }
+  };
+  
+  window.editObj = (id, newProps) => {
+    const res = model.editObj(id, newProps);
+    if (res.ok) {
+      console.log(`Объект ${id} обновлен.`);
+      controller.updateAllViews();
+    } else {
+      console.error(`Ошибка обновления ${id}: ${res.reason}`);
+    }
+  };
+  
+  window.login = (name) => {
+    controller.currentUser = name;
+    localStorage.setItem('ambulance_user', name);
+    controller.updateAllViews();
+    console.log(`Вход выполнен как: ${name}`);
+  };
+  
+  window.logout = () => {
+    controller.currentUser = null;
+    localStorage.removeItem('ambulance_user');
+    controller.updateAllViews();
+    console.log('Выход выполнен');
+  };
+  
+  window.filterCalls = (criteria) => {
+    controller.currentFilter = { ...criteria, type: 'call' };
+    controller.currentPage = 0;
+    controller.updateCallsView();
+    console.log('Применен фильтр:', controller.currentFilter);
+  };
+});

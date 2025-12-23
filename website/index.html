@@ -1,21 +1,17 @@
 <!DOCTYPE html>
 <html data-bs-theme="light" lang="ru">
-
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
     <title>АИС «Скорая помощь»</title>
     <link rel="stylesheet" href="assets/css/styles.css">
-    <script src="scripts.js"></script>
 </head>
-
 <body>
     <header class="site-header" role="banner">
-        <div class="container header-inner"><img src="assets/img/main.jpg" width="86" height="82">
+        <div class="container header-inner">
             <div class="brand">
-                <div>
-                    <h1>АИС «Скорая помощь»</h1>
-                </div>
+                <h1>АИС «Скорая помощь»</h1>
+                <p class="tagline">Лечебное учреждение скорой медицинской помощи</p>
             </div>
             <nav class="main-nav" role="navigation" aria-label="Главное меню">
                 <ul class="menu">
@@ -24,8 +20,8 @@
                     <li><a href="#staff">Сотрудники</a></li>
                     <li><a href="#orders">Приказы</a></li>
                     <li><a href="#admin">Админ</a></li>
-                    <li><a href="#reports">Отчёты</a></li>
-                    <li><button id="openAuth" class="btn-link" aria-haspopup="dialog">Войти</button></li>
+                    <li><span id="user-display" style="margin-left:10px; color:var(--accent); font-weight:bold;"></span></li>
+                    <li><button id="openAuth" class="btn-link">Войти</button></li>
                 </ul>
             </nav>
         </div>
@@ -34,115 +30,225 @@
         <section id="home" class="panel hero" aria-labelledby="homeTitle">
             <div class="hero-left">
                 <h2 id="homeTitle">Лечебное учреждение скорой медицинской помощи</h2>
-                <p class="lead">Краткое название: ЛУСМП Код: <strong>GSSMP-001</strong> · Адрес: ул. Например, 1 · Тел: +375 29 111-22-33</p>
-                <div class="quick-actions"><button class="btn" data-action="new-call">Новый вызов</button><button class="btn ghost" data-action="add-employee">Добавить сотрудника</button><button class="btn ghost" data-action="create-order">Создать приказ</button></div>
-                <div class="wireframe-links">
-                    <ul></ul>
+                <p class="lead">Код: <strong>GSSMP-001</strong> · Адрес: ул. Медицинская, 1 · Тел: +375 29 111-22-33</p>
+                <div class="quick-actions">
+                    <button class="btn" data-action="new-call">Новый вызов</button>
+                    <button class="btn ghost" data-action="add-employee">Добавить сотрудника</button>
+                    <button class="btn ghost" data-action="create-order">Создать приказ</button>
+                </div>
+                <div class="notes">
+                    <p>Система ведет учет вызовов, сотрудников и приказов</p>
                 </div>
             </div>
             <div class="hero-right">
                 <div class="stat">
-                    <div class="stat-number"><span>10</span></div>
+                    <div class="stat-number"><span id="brigades-count">10</span></div>
                     <div class="stat-label"><span>Бригад</span></div>
                 </div>
                 <div class="stat">
-                    <div class="stat-number"><span>100</span></div>
+                    <div class="stat-number"><span id="staff-count">100</span></div>
                     <div class="stat-label"><span>Сотрудников</span></div>
                 </div>
                 <div class="stat">
-                    <div class="stat-number"><span>Сегодня</span></div>
-                    <div class="stat-label"><span>30 выездов</span></div>
+                    <div class="stat-number"><span id="today-calls">30</span></div>
+                    <div class="stat-label"><span>Вызовов сегодня</span></div>
                 </div>
             </div>
         </section>
         <section id="calls" class="panel" aria-labelledby="callsTitle">
             <h3 id="callsTitle">Выезды бригад — поиск / просмотр</h3>
-            <form class="row filter-form" role="search" aria-label="Фильтр выездов"><label>Дата <input aria-label="Дата" type="date"></label><label>Бригада <input aria-label="Бригада" placeholder="Номер бригады"></label><label>Сортировать <select aria-label="Сортировка">
-                        <option value="">По времени (убыв.)</option>
-                        <option value="">По времени (возр.)</option>
-                        <option value="">По бригаде</option>
-                    </select></label>
-                <div class="form-actions"><button class="btn">Показать</button><button class="btn ghost" type="button">Очистить</button></div>
+            <form class="row filter-form" role="search" aria-label="Фильтр выездов">
+                <label>Дата с
+                    <input type="date" name="dateFrom" aria-label="Дата с">
+                </label>
+                <label>Дата по
+                    <input type="date" name="dateTo" aria-label="Дата по">
+                </label>
+                <label>Бригада
+                    <input name="brigade" placeholder="Номер бригады" aria-label="Бригада">
+                </label>
+                <label>Статус
+                    <select name="status" aria-label="Статус вызова">
+                        <option value="">Все</option>
+                        <option value="closed">Закрыт</option>
+                        <option value="hospitalized">Госпитализация</option>
+                    </select>
+                </label>
+                <div class="form-actions">
+                    <button type="submit" class="btn">Применить фильтр</button>
+                    <button type="button" class="btn ghost" id="clear-filter">Очистить</button>
+                </div>
             </form>
             <div class="table-like" role="list" aria-label="Список выездов">
-                <div class="row header" role="listitem"><div class="cell">№</div><div class="cell">Время выезда</div><div class="cell">Бригада</div><div class="cell">Адрес</div><div class="cell">Пациент / Меры</div><div class="cell">Статус</div><div class="cell">Действия</div></div>
-                <div class="row" role="listitem" aria-label="Вызов 2"><div class="cell">1</div><div class="cell">2025-05-12 16:05</div><div class="cell">Б-03</div><div class="cell">пр. Победы, 14</div><div class="cell">Оказана помощь, пациент дома</div><div class="cell">Открыт</div><div class="cell actions">
-            <button class="btn small" data-link="#call-view-2">Открыть</button>
-            <button class="btn small ghost" data-link="#add-edit?type=call&amp;edit=2">Ред.</button>
-          </div></div>
+                <div class="row header" role="listitem">
+                    <div class="cell">ID</div>
+                    <div class="cell">Время выезда</div>
+                    <div class="cell">Бригада</div>
+                    <div class="cell">Адрес</div>
+                    <div class="cell">Пациент</div>
+                    <div class="cell">Статус</div>
+                    <div class="cell">Действия</div>
+                </div>
+                <div id="calls-data"></div>
+            </div>
+            <div id="pagination-controls" style="margin-top: 15px; text-align: center;">
+                <button id="load-more-calls" class="btn ghost" style="display: none;">Показать ещё</button>
             </div>
         </section>
         <section id="staff" class="panel" aria-labelledby="staffTitle">
             <h3 id="staffTitle">Сотрудники — поиск / CRUD</h3>
-            <div class="row controls"><button class="btn" data-action="add-employee">Добавить сотрудника</button><label style="margin-left:8px;">Поиск
-          <input placeholder="ФИО или табельный номер">
-        </label><div class="spacer"></div><button class="btn ghost">Сортировка / фильтр</button></div>
-            <div class="card-list" aria-live="polite">
-                <article class="card" role="article" aria-label="Сотрудник Иванов">
-                    <div class="card-head">
-                        <h4>Иванов И.И.</h4>
-                        <div class="meta"><span>Таб. № 12345 · Врач</span></div>
-                    </div>
-                    <div class="card-body">
-                        <p>Смена: 24ч (с 01.05.2025) · Бригада: Б-12</p>
-                        <p>Контакты: +375291112233</p>
-                    </div>
-                    <div class="card-actions"><button class="btn small" data-link="#add-edit?type=employee&amp;edit=12345">Редактировать</button><button class="btn small ghost" data-link="#orders?employee=12345">Приказы</button><button class="btn small ghost danger" aria-label="Удалить сотрудника">Удалить</button></div>
-                </article>
+            <div class="row controls">
+                <button class="btn" data-action="add-employee">Добавить сотрудника</button>
+                <label style="margin-left:8px;">Поиск
+                    <input id="staff-search" placeholder="ФИО или табельный номер">
+                </label>
+                <div class="spacer"></div>
+                <button class="btn ghost" id="filter-staff">Сортировка / фильтр</button>
             </div>
+            <div class="card-list" aria-live="polite" id="staff-list"></div>
         </section>
         <section id="orders" class="panel" aria-labelledby="ordersTitle">
             <h3 id="ordersTitle">Приказы о закреплении сотрудников в бригадах</h3>
-            <div class="row controls"><button class="btn">Создать приказ</button><button class="btn ghost">Архив приказов</button></div>
-            <div class="orders-list">
-                <article class="card">
-                    <h4>Приказ №45 (01.05.2025)</h4>
-                    <p>Позиция: Иванов И.И. — Б-12 (01.05.2025 — 08.05.2025)</p>
-                    <div class="card-actions"><button class="btn small" data-link="#add-edit?type=order&amp;edit=45">Открыть</button></div>
-                </article>
+            <div class="row controls">
+                <button class="btn" data-action="create-order">Создать приказ</button>
+                <button class="btn ghost" id="archive-orders">Архив приказов</button>
             </div>
+            <div class="orders-list" id="orders-list"></div>
         </section>
         <section id="admin" class="panel" aria-labelledby="adminTitle">
             <h3 id="adminTitle">Панель администратора</h3>
-            <p>Форма управления пользователями системы (добавление/редактирование/удаление). Доступ: только администратор.</p>
+            <p>Форма управления пользователями системы (добавление/редактирование/удаление).</p>
             <div class="admin-grid">
                 <div>
-                    <h4>CRUD пользователи</h4>
-                    <p>Добавить / Редактировать / Удалить учетную запись: логин, роль (диспетчер/медработник/руководитель/админ), привязка к сотруднику.</p><button class="btn">Добавить пользователя</button>
+                    <h4>Управление данными</h4>
+                    <button class="btn" id="export-data">Экспорт данных</button>
+                    <button class="btn ghost" id="import-data">Импорт данных</button>
+                    <button class="btn danger" id="clear-data">Очистить все данные</button>
+                </div>
+                <div>
+                    <h4>Статистика системы</h4>
+                    <p>Всего записей: <span id="total-records">0</span></p>
+                    <p>Вызовов: <span id="calls-count">0</span></p>
+                    <p>Сотрудников: <span id="employees-count">0</span></p>
+                    <p>Приказов: <span id="orders-count">0</span></p>
                 </div>
             </div>
         </section>
-        <section id="add-edit" class="panel" aria-labelledby="addEditTitle">
+        <section id="add-edit" class="panel item-form" aria-labelledby="addEditTitle" style="display: none;">
             <h3 id="addEditTitle">Форма добавления / редактирования</h3>
-            <form class="item-form" aria-label="Форма добавления или редактирования"><label>Тип записи <select>
-                        <option value="">Вызов</option>
-                        <option value="">Сотрудник</option>
-                        <option value="">Приказ</option>
-                    </select></label><label>Краткое описание <input placeholder="Короткое описание"></label><label>Детали<textarea placeholder="Дата выезда, адрес, ФИО пациента, меры, время прибытия и т.д." rows="4"></textarea></label><label>Связанные записи <input placeholder="Номер бригады / Таб. номер сотрудника / Код учреждения"></label>
-                <div class="form-actions"><button class="btn">Сохранить</button><button class="btn ghost" type="button">Отмена</button></div>
+            <form id="item-form" aria-label="Форма добавления или редактирования">
+                <label>Тип записи
+                    <select id="item-type" required>
+                        <option value="">Выберите тип</option>
+                        <option value="call">Вызов</option>
+                        <option value="employee">Сотрудник</option>
+                        <option value="order">Приказ</option>
+                    </select>
+                </label>
+                <div id="call-fields" style="display: none;">
+                    <label>Дата и время вызова
+                        <input type="datetime-local" id="call-datetime">
+                    </label>
+                    <label>Бригада
+                        <input type="text" id="call-brigade" placeholder="Б-01">
+                    </label>
+                    <label>Адрес
+                        <input type="text" id="call-address" placeholder="ул. Примерная, 1">
+                    </label>
+                    <label>ФИО пациента
+                        <input type="text" id="call-patient">
+                    </label>
+                    <label>Принятые меры
+                        <textarea id="call-measures" rows="3"></textarea>
+                    </label>
+                    <label>Статус
+                        <select id="call-status">
+                            <option value="closed">Закрыт</option>
+                            <option value="hospitalized">Госпитализация</option>
+                        </select>
+                    </label>
+                    <label>Время прибытия
+                        <input type="datetime-local" id="call-arrival">
+                    </label>
+                </div>
+                <div id="employee-fields" style="display: none;">
+                    <label>Табельный номер
+                        <input type="text" id="emp-staff-number">
+                    </label>
+                    <label>ФИО
+                        <input type="text" id="emp-fullname" placeholder="Иванов Иван Иванович">
+                    </label>
+                    <label>Должность
+                        <input type="text" id="emp-position" placeholder="Врач">
+                    </label>
+                    <label>Бригада
+                        <input type="text" id="emp-brigade" placeholder="Б-01">
+                    </label>
+                    <label>Дата начала смены
+                        <input type="date" id="emp-shift-start">
+                    </label>
+                    <label>Телефоны (через запятую)
+                        <input type="text" id="emp-phones" placeholder="+375291112233, +375331112233">
+                    </label>
+                </div>
+                <div id="order-fields" style="display: none;">
+                    <label>Номер приказа
+                        <input type="text" id="order-number">
+                    </label>
+                    <label>Дата приказа
+                        <input type="date" id="order-date">
+                    </label>
+                    <label>Описание
+                        <textarea id="order-description" rows="3"></textarea>
+                    </label>
+                </div>
+                <label>Краткое описание
+                    <input type="text" id="item-description" placeholder="Короткое описание" required>
+                </label>
+                <div class="form-actions">
+                    <button type="submit" class="btn">Сохранить</button>
+                    <button type="button" class="btn ghost" id="cancel-edit">Отмена</button>
+                </div>
+                <input type="hidden" id="edit-item-id">
             </form>
         </section>
         <section id="reports" class="panel" aria-labelledby="reportsTitle">
             <h3 id="reportsTitle">Отчёты для руководства</h3>
-            <form class="report-form" aria-label="Формирование отчёта"><label>Дата <input type="date"></label><label>Тип отчёта <select>
-                        <option value="">Список выездов за дату</option>
-                        <option value="">Описание самого длительного выезда</option>
-                        <option value="">Состав бригады на дату</option>
-                    </select></label>
-                <div class="form-actions"><button class="btn" style="padding: 10px;margin: 5px;">Сформировать</button></div>
+            <form class="report-form" id="report-form" aria-label="Формирование отчёта">
+                <label>Дата
+                    <input type="date" id="report-date" required>
+                </label>
+                <label>Тип отчёта
+                    <select id="report-type" required>
+                        <option value="">Выберите тип отчёта</option>
+                        <option value="calls-list">Список выездов за дату</option>
+                        <option value="longest-call">Описание самого длительного выезда</option>
+                        <option value="brigade-staff">Состав бригады на дату</option>
+                    </select>
+                </label>
+                <div class="form-actions">
+                    <button type="submit" class="btn">Сформировать</button>
+                </div>
             </form>
-            <div class="report-result"></div>
+            <div class="report-result" id="report-result" style="display: none;"></div>
         </section>
-        <section id="auth" class="panel panel-modal" aria-labelledby="authTitle" aria-hidden="true">
-            <h3 id="authTitle">Авторизация</h3>
-            <form class="auth-form" aria-label="Форма авторизации"><label style="font-style: italic;font-weight: bold;margin: 10px;">Логин <input></label><label style="text-align: left;font-weight: bold;font-style: italic;margin: 10px;">Пароль <input type="password"></label>
-                <div class="form-actions"><button class="btn">Войти</button><button class="btn ghost" type="button">Отмена</button></div>
-            </form>
-        </section>
-        <section id="error" class="panel panel-error" aria-hidden="true">
-            <h3>Страница не найдена</h3><img width="532" height="268" src="assets/img/404-page_found_error.jpg">
-            <p><a href="#home">Вернуться на главную</a></p>
-        </section>
+        <div id="auth-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>Авторизация</h3>
+                <form id="auth-form">
+                    <label>Логин
+                        <input type="text" id="login-username" placeholder="Введите логин" required>
+                    </label>
+                    <label>Пароль
+                        <input type="password" id="login-password" placeholder="Введите пароль" required>
+                    </label>
+                    <div class="form-actions">
+                        <button type="submit" class="btn">Войти</button>
+                        <button type="button" class="btn ghost" id="cancel-auth">Отмена</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </main>
     <footer class="site-footer" role="contentinfo">
         <div class="container footer-inner">
@@ -150,9 +256,10 @@
                 <p>2025 — АИС «Скорая помощь»</p>
             </div>
             <div>
-                <p class="muted">Ссылка на репозиторий: https://github.com/pavhom78011/TP/tree/main/website</p>
+                <p class="muted">Все данные сохраняются локально в браузере</p>
             </div>
         </div>
     </footer>
+    <script src="scripts.js"></script>
 </body>
 </html>

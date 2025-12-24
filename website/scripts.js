@@ -248,13 +248,11 @@ class AmbulanceCollection {
 const ambulanceCollection = new AmbulanceCollection(initialObjs);
 console.group('AmbulanceCollection');
 console.log('_dumpAll', ambulanceCollection._dumpAll());
-console.log('removeObj', ambulanceCollection.removeObj('emp-001'));
-console.log('_dumpAll', ambulanceCollection._dumpAll());
 console.log('getObjs(0,8):', ambulanceCollection.getObjs(0, 8));
 console.log('getObjs filtered calls in 2025-04-01..2025-06-30:', ambulanceCollection.getObjs(0, 50, { type: 'call', dateFrom: '2025-04-01', dateTo: '2025-06-30' }));
 console.log('Employees in brigade Б-01:', ambulanceCollection.getObjs(0, 50, { type: 'employee', brigade: 'Б-01' }));
 const validEmployee = {
-  id: 'test-emp',
+  id: 'test-emp01',
   description: 'Тестовый сотрудник',
   createdAt: new Date(),
   author: 'Тест',
@@ -282,6 +280,8 @@ const validCall = {
   crew: []
 };
 console.log('addObj', ambulanceCollection.addObj(validEmployee));
+console.log('_dumpAll', ambulanceCollection._dumpAll());
+console.log('removeObj', ambulanceCollection.removeObj('test-emp01'));
 console.log('_dumpAll', ambulanceCollection._dumpAll());
 console.groupEnd();
 
@@ -729,11 +729,11 @@ class AmbulanceController {
     this.view.updateRequiredAttributes(type);
   }
 
-  handleItemSubmit(e) {
+handleItemSubmit(e) {
     e.preventDefault();
     if (!this.currentUser) {
-      this.view.showNotification('Требуется авторизация', 'error');
-      return;
+        this.view.showNotification('Требуется авторизация', 'error');
+        return;
     }
     
     const type = document.getElementById('item-type').value;
@@ -741,106 +741,109 @@ class AmbulanceController {
     const description = document.getElementById('item-description').value;
     
     if (!type) {
-      this.view.showNotification('Выберите тип записи', 'error');
-      return;
+        this.view.showNotification('Выберите тип записи', 'error');
+        return;
     }
     
     if (!description || description.trim() === '') {
-      this.view.showNotification('Заполните краткое описание', 'error');
-      document.getElementById('item-description').focus();
-      return;
+        this.view.showNotification('Заполните краткое описание', 'error');
+        document.getElementById('item-description').focus();
+        return;
     }
     
     let validationPassed = true;
     
     if (type === 'call') {
-      const requiredFields = ['call-datetime', 'call-brigade', 'call-address', 'call-measures'];
-      requiredFields.forEach(fieldId => {
-        const field = document.getElementById(fieldId);
-        if (field && (!field.value || field.value.trim() === '')) {
-          field.classList.add('error');
-          validationPassed = false;
-        } else if (field) {
-          field.classList.remove('error');
-        }
-      });
+        const requiredFields = ['call-datetime', 'call-brigade', 'call-address', 'call-measures'];
+        requiredFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field && (!field.value || field.value.trim() === '')) {
+                field.classList.add('error');
+                validationPassed = false;
+            } else if (field) {
+                field.classList.remove('error');
+            }
+        });
     } else if (type === 'employee') {
-      const requiredFields = ['emp-staff-number', 'emp-fullname', 'emp-position', 'emp-shift-start'];
-      requiredFields.forEach(fieldId => {
-        const field = document.getElementById(fieldId);
-        if (field && (!field.value || field.value.trim() === '')) {
-          field.classList.add('error');
-          validationPassed = false;
-        } else if (field) {
-          field.classList.remove('error');
-        }
-      });
+        const requiredFields = ['emp-staff-number', 'emp-fullname', 'emp-position', 'emp-shift-start'];
+        requiredFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field && (!field.value || field.value.trim() === '')) {
+                field.classList.add('error');
+                validationPassed = false;
+            } else if (field) {
+                field.classList.remove('error');
+            }
+        });
     } else if (type === 'order') {
-      const requiredFields = ['order-number', 'order-date', 'order-description'];
-      requiredFields.forEach(fieldId => {
-        const field = document.getElementById(fieldId);
-        if (field && (!field.value || field.value.trim() === '')) {
-          field.classList.add('error');
-          validationPassed = false;
-        } else if (field) {
-          field.classList.remove('error');
-        }
-      });
+        const requiredFields = ['order-number', 'order-date', 'order-description'];
+        requiredFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field && (!field.value || field.value.trim() === '')) {
+                field.classList.add('error');
+                validationPassed = false;
+            } else if (field) {
+                field.classList.remove('error');
+            }
+        });
     }
     
     if (!validationPassed) {
-      this.view.showNotification('Заполните все обязательные поля', 'error');
-      return;
+        this.view.showNotification('Заполните все обязательные поля', 'error');
+        return;
     }
     
     let itemData = {
-      type,
-      description,
-      createdAt: new Date(),
-      author: this.currentUser,
-      photoLink: ''
+        type,
+        description,
+        photoLink: ''
     };
+
+    if (!id) {
+        itemData.createdAt = new Date();
+        itemData.author = this.currentUser;
+    }
     
     if (type === 'call') {
-      itemData.id = id || `call-${Date.now()}`;
-      itemData.dateTime = new Date(document.getElementById('call-datetime').value);
-      itemData.brigade = document.getElementById('call-brigade').value;
-      itemData.address = document.getElementById('call-address').value;
-      itemData.patientName = document.getElementById('call-patient').value;
-      itemData.measures = document.getElementById('call-measures').value;
-      itemData.status = document.getElementById('call-status').value;
-      itemData.arrivalTime = new Date(document.getElementById('call-arrival').value);
-      itemData.crew = [];
-      itemData.hospitalSent = null;
+        itemData.id = id || `call-${Date.now()}`;
+        itemData.dateTime = new Date(document.getElementById('call-datetime').value);
+        itemData.brigade = document.getElementById('call-brigade').value;
+        itemData.address = document.getElementById('call-address').value;
+        itemData.patientName = document.getElementById('call-patient').value;
+        itemData.measures = document.getElementById('call-measures').value;
+        itemData.status = document.getElementById('call-status').value;
+        itemData.arrivalTime = new Date(document.getElementById('call-arrival').value);
+        itemData.crew = [];
+        itemData.hospitalSent = null;
     } else if (type === 'employee') {
-      itemData.id = id || `emp-${Date.now()}`;
-      itemData.staffNumber = document.getElementById('emp-staff-number').value;
-      itemData.fullName = document.getElementById('emp-fullname').value;
-      itemData.position = document.getElementById('emp-position').value;
-      itemData.brigade = document.getElementById('emp-brigade').value;
-      itemData.shiftStart = document.getElementById('emp-shift-start').value;
-      const phones = document.getElementById('emp-phones').value;
-      itemData.phones = phones ? phones.split(',').map(p => p.trim()).filter(p => p) : [];
+        itemData.id = id || `emp-${Date.now()}`;
+        itemData.staffNumber = document.getElementById('emp-staff-number').value;
+        itemData.fullName = document.getElementById('emp-fullname').value;
+        itemData.position = document.getElementById('emp-position').value;
+        itemData.brigade = document.getElementById('emp-brigade').value;
+        itemData.shiftStart = document.getElementById('emp-shift-start').value;
+        const phones = document.getElementById('emp-phones').value;
+        itemData.phones = phones ? phones.split(',').map(p => p.trim()).filter(p => p) : [];
     } else if (type === 'order') {
-      itemData.id = id || `ord-${Date.now()}`;
-      itemData.orderNumber = document.getElementById('order-number').value;
-      itemData.orderDate = document.getElementById('order-date').value;
-      itemData.positions = [];
+        itemData.id = id || `ord-${Date.now()}`;
+        itemData.orderNumber = document.getElementById('order-number').value;
+        itemData.orderDate = document.getElementById('order-date').value;
+        itemData.positions = [];
     }
     
     let result;
     if (id) {
-      result = this.model.editObj(id, itemData);
+        result = this.model.editObj(id, itemData);
     } else {
-      result = this.model.addObj(itemData);
+        result = this.model.addObj(itemData);
     }
     
     if (result.ok) {
-      this.view.hideItemForm();
-      this.updateAllViews();
-      this.view.showNotification(id ? 'Данные обновлены' : 'Запись добавлена', 'success');
+        this.view.hideItemForm();
+        this.updateAllViews();
+        this.view.showNotification(id ? 'Данные обновлены' : 'Запись добавлена', 'success');
     } else {
-      this.view.showNotification(`Ошибка: ${result.reason}`, 'error');
+        this.view.showNotification(`Ошибка: ${result.reason}`, 'error');
     }
   }
 
@@ -1102,3 +1105,74 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Применен фильтр:', controller.currentFilter);
   };
 });
+
+/* addObj({
+  id: 'test-call-01',
+  description: 'Тестовый вызов из консоли',
+  createdAt: new Date(),
+  author: 'Тестер',
+  type: 'call',
+  dateTime: new Date(),
+  brigade: 'Б-99',
+  address: 'ул. Тестовая, 1',
+  patientName: 'Тестов Тест Тестович',
+  measures: 'Тестовые мероприятия',
+  arrivalTime: new Date(),
+  status: 'closed',
+  crew: []
+});
+
+addObj({
+  id: 'test-emp-01',
+  description: 'Тестовый сотрудник',
+  createdAt: new Date(),
+  author: 'Тестер',
+  type: 'employee',
+  staffNumber: '9999',
+  fullName: 'Тестов Тест Тестович',
+  position: 'Врач',
+  shiftStart: '2024-01-01',
+  brigade: 'Б-99',
+  phones: ['+375291112233']
+});
+
+addObj({
+  id: 'test-ord-01',
+  description: 'Тестовый приказ',
+  createdAt: new Date(),
+  author: 'Тестер',
+  type: 'order',
+  orderNumber: '999',
+  orderDate: '2024-01-01',
+  positions: []
+});
+
+removeObj('test-call-01');
+
+removeObj('emp-001');
+
+removeObj('non-existent-id');
+
+editObj('call-001', {description: 'Новое описание вызова - падение с высоты'});
+
+editObj('emp-002', {brigade: 'Б-99', position: 'Старший фельдшер'});
+
+editObj('ord-045', {description: 'Приказ №45: новое назначение'});
+
+login('admin');
+
+login('Диспетчер-1');
+
+login('Отдел кадров');
+
+logout();
+
+filterCalls({dateFrom: '2025-05-01', dateTo: '2025-05-31'});
+
+filterCalls({brigade: 'Б-01'});
+
+filterCalls({status: 'hospitalized'});
+
+filterCalls({brigade: 'Б-02', dateFrom: '2025-04-01', dateTo: '2025-06-01', status: 'closed'});
+
+filterCalls({}); */
